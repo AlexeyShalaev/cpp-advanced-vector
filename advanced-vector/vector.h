@@ -160,7 +160,7 @@ public:
             return;
         }
         RawMemory<T> new_data(new_capacity);
-        Realloccate(begin(), size_, new_data.GetAddress());
+        Relocate(begin(), size_, new_data.GetAddress());
         std::destroy_n(begin(), size_);
         data_.Swap(new_data);
     }
@@ -197,6 +197,7 @@ public:
 
     template<typename... Args>
     iterator Emplace(const_iterator pos, Args &&... args) {
+        assert(pos >= cbegin() && pos <= cend());
         auto dist = std::distance(cbegin(), pos);
         if (size_ != Capacity()) {
             if (pos == nullptr || pos == end()) {
@@ -220,8 +221,8 @@ public:
         } else {
             RawMemory<T> new_data(size_ > 0 ? size_ * 2 : 1);
             ForwardConstruct(new_data + dist, std::forward<Args>(args)...);
-            Realloccate(begin(), dist, new_data.GetAddress());
-            Realloccate(begin() + dist, size_ - dist, new_data.GetAddress() + dist + 1);
+            Relocate(begin(), dist, new_data.GetAddress());
+            Relocate(begin() + dist, size_ - dist, new_data.GetAddress() + dist + 1);
             std::destroy_n(begin(), size_);
             data_.Swap(new_data);
         }
@@ -244,6 +245,7 @@ public:
     }
 
     iterator Erase(const_iterator pos) noexcept(std::is_nothrow_move_assignable_v<T>) {
+        assert(pos >= cbegin() && pos <= cend());
         auto dist = std::distance(cbegin(), pos);
         auto iter = const_cast<iterator>(pos);
         if (std::is_nothrow_move_constructible_v<T> || !std::is_copy_constructible_v<T>) {
@@ -303,7 +305,7 @@ public:
     }
 
 private:
-    void static Realloccate(T *InFirst, size_t dist, T *OutFirst) {
+    void static Relocate(T *InFirst, size_t dist, T *OutFirst) {
         if constexpr (std::is_nothrow_move_constructible_v<T> || !std::is_copy_constructible_v<T>) {
             std::uninitialized_move_n(InFirst, dist, OutFirst);
         } else {
